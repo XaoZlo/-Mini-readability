@@ -1,0 +1,16 @@
+{
+   "main_content_selector":"p",
+   "nested_selectors":[
+      "p",
+      "i",
+      "span",
+      "a"
+   ],
+   "title_selector":"h1",
+   "max_row_length":80,
+   "exclude_selectors":[
+      "header",
+      "footer"
+   ],
+   "do_save_urls": 0
+}

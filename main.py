@@ -3,6 +3,7 @@ import sys
 import argparse
 import requests
 import urllib.parse
+import json
 from html.parser import HTMLParser
 
 
@@ -10,28 +11,38 @@ class Main:
 
     def __init__(self):
 
-        self.settings = {
-            'main_content_selector': 'p',
-            'nested_selectors': ['p', 'i', 'span', 'a'],
-            'title_selector': 'h1',
-            'article': 'article',
-            'max_row_length': 80
-        }
-
         self.cur_dir = os.getcwd()
         self.url = self.get_url_from_argv()
         self.raw_html = self.get_raw_html()
+        self.settings = {
+            'main_content_selectors': 'p',
+            'nested_selectors': ['p', 'i', 'span', 'a'],
+            'title_selector': 'h1',
+            'max_row_length': 80,
+            'exclude_selectors': ['header', 'footer'],
+            'do_save_urls': 1
+        }
+        self.get_settings()
         parser = MyHTMLParser(self.url, self.settings)
         parser.feed(self.raw_html)
         self.content = self.make_rows(parser.content)
 
     def get_settings(self):
-        settings_file = self.cur_dir + '/settings.json'
-        if os.path.exists(settings_file):
-            with open(settings_file, 'r', encoding='utf-8') as settings:
-                print(settings.readline())
+        f = self.cur_dir + '/settings.json'
+        if os.path.exists(f):
+            with open(f, 'r', encoding='utf-8') as f:
+                try:
+                    dump_settings = json.loads(f.read())
+                    for key in self.settings.keys():
+                        if key not in dump_settings:
+                            print('Не хватает опций в настройках.\nИспользуем настройки по умолчаниюю.\n')
+                            return
+                    self.settings = dump_settings
+                except json.decoder.JSONDecodeError:
+                    print('Не удалось загрузить настройки.\nИспользуем настройки по умолчаниюю.\n')
         else:
-            print('Нет файла настроек!')
+            with open(f, 'w', encoding='utf-8') as f:
+                json.dump(self.settings, f)
 
     def get_raw_html(self):
         """Юзер агент чтобы сайты не думали что мы робот"""
@@ -132,15 +143,21 @@ class MyHTMLParser(HTMLParser):
         self.url_flag = 0
         self.url_to_write = ''
         self.title_flag = 0
+        self.nested_flag = 0
         self.hostname = urllib.parse.urlparse(url)[1]
-        self.exclude_selectors = ['header', 'footer']
         self.settings = settings
 
     def handle_starttag(self, tag, attrs):
-        if tag in self.exclude_selectors:
+        if tag in self.settings['exclude_selectors']:
             self.exclude_flag = 1
             return
-        if tag == 'a' and self.recording:
+
+        if tag in self.settings['nested_selectors']:
+            self.nested_flag = 1
+        else:
+            self.nested_flag = 0
+
+        if tag == 'a' and self.recording and self.nested_flag and self.settings['do_save_urls'] == 1:
             self.url_flag = 1
             self.url_to_write = attrs[0][1]
             if not urllib.parse.urlparse(self.url_to_write)[1]:
@@ -148,31 +165,44 @@ class MyHTMLParser(HTMLParser):
 
         if tag in self.settings['title_selector']:
             self.title_flag = 1
-        if tag in self.settings['main_content_selector']:
+
+        if tag in self.settings['main_content_selectors']:
             self.recording = 1
         else:
             return
 
     def handle_endtag(self, tag):
-        if tag in self.exclude_selectors and self.exclude_flag:
+        if tag in self.settings['exclude_selectors'] and self.exclude_flag:
             self.exclude_flag = 0
             return
-        if tag == self.settings['main_content_selector'] and self.recording:
+
+        if tag in self.settings['nested_selectors'] and self.nested_flag:
+            self.nested_flag = 0
+            return
+
+        if tag == self.settings['main_content_selectors'] and self.recording:
             self.recording -= 1
             self.paragraph_flag = 1
 
     def handle_data(self, data):
+        if self.exclude_flag:
+            return
+
         if self.title_flag:
             self.content = '%s%s%s' % (self.content, data, '\n\n')
             self.title_flag = 0
-        if self.exclude_flag:
-            return
+
         if self.recording:
             if self.paragraph_flag:
                 self.content = '%s%s%s' % (self.content, '\n\n', data)
                 self.paragraph_flag = 0
+
+            if self.nested_flag:
+                self.content = '%s%s' % (self.content, data)
+                self.nested_flag = 0
             else:
                 self.content = '%s%s' % (self.content, data)
+
             if self.url_flag:
                 self.content = '%s [%s]' % (self.content, self.url_to_write)
                 self.url_flag = 0

@@ -96,6 +96,7 @@ https://proufu.ru/news/economika/77645-protezhe_byvshego_glavy_minzdrava_bashkir
 https://gorobzor.ru/novosti/ekonomika/24362-otzyv-licenzii-roskomsnabbanka-mozhet-otrazitsya-na-vyvoze-musora-v-bashkirii - Текст получен с небольшим количеством мусора, текст читабелен.
 
 https://sport.pravda.ru/news/1409954-biathlon/ - Текст страницы без мусора
+
 ##Итог
 Учитывая не идеальный результат на всех страницах, в дальнейшем нужно добавить:
  - Более тонкую настройку фильтров. 

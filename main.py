@@ -1,8 +1,8 @@
 import os
-import re
 import sys
 import argparse
 import requests
+import urllib.parse
 from html.parser import HTMLParser
 
 
@@ -13,14 +13,14 @@ class Main:
         self.cur_dir = os.getcwd()
         self.url = self.get_url_from_argv()
         self.raw_html = self.get_raw_html()
-        parser = MyHTMLParser()
+        parser = MyHTMLParser(self.url)
         parser.feed(self.raw_html)
         self.content = parser.article
         print(parser.article)
         pass
 
     def get_settings(self):
-        settings_file = self.cur_dir + '/setings.json'
+        settings_file = self.cur_dir + '/settings.json'
         if os.path.exists(settings_file):
             with open(settings_file, 'r', encoding='utf-8') as settings:
                 print(settings.readline())
@@ -60,30 +60,40 @@ class Main:
     def write_to_file(self):
 
         """Вытаскиваем из ссылки строку после https://"""
-        parsed_path = re.search(r'^(.*:)//(.*)/$', self.url)
-        '''Меняем '/' на '\' '''
-        parsed_path = parsed_path.replace('/', '\\')
+        raw_url = urllib.parse.urlparse(self.url)
 
-        file_name =  self.cur_dir + '\\' + parsed_path + '.txt'
-        dir_name = os.path.dirname(file_name)
+        raw_path = '%s%s' % (raw_url[1], raw_url[2])
+
+        """Проверяем есть ли название файла"""
+        file_batch = os.path.split(raw_path)
+        if len(file_batch[1]) == 0:
+            raw_path = '%s%s' % (file_batch[0], '.txt')
+        else:
+            raw_path = '%s%s%s' % (file_batch[0], file_batch[1].split('.')[0], '.txt')
+        '''Меняем '/' на '\' '''
+        raw_path = raw_path.replace('/', '\\')
+        file_path = self.cur_dir + '\\' + raw_path
+        dir_name = os.path.dirname(file_path)
         """Проверяем есть ли указанная директория"""
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
-        with open(file_name, 'w', encoding="utf-8") as file:
+        with open(file_path, 'w', encoding="utf-8") as file:
             file.write(self.content)
-
-        return True
 
 
 class MyHTMLParser(HTMLParser):
 
-    def __init__(self):
+    def __init__(self, url):
         super().__init__()
         self.user = 'x'
 
         self.article = ''
         self.recording = 0
         self.exclude_flag = 0
+        self.paragraph_flag = 0
+        self.url_flag = 0
+        self.url_to_write = ''
+        self.hostname = urllib.parse.urlparse(url)[1]
         self.selectors = {
             'main_content_selector': 'p',
             'nested_selectors': ['p', 'i', 'span', 'a'],
@@ -97,14 +107,16 @@ class MyHTMLParser(HTMLParser):
         if tag in self.exclude_selectors:
             self.exclude_flag = 1
             return
+        if tag == 'a' and self.recording:
+            self.url_flag = 1
+            self.url_to_write = attrs[0][1]
+            if not urllib.parse.urlparse(self.url_to_write)[1]:
+                self.url_to_write = '%s%s' % (self.hostname, self.url_to_write)
+
         if tag in self.selectors['main_content_selector']:
-            pass
+            self.recording = 1
         else:
             return
-        #if self.recording:
-         #  self.recording += 1
-         #   return
-        self.recording = 1
 
     def handle_endtag(self, tag):
         if tag in self.exclude_selectors and self.exclude_flag:
@@ -112,13 +124,20 @@ class MyHTMLParser(HTMLParser):
             return
         if tag == self.selectors['main_content_selector'] and self.recording:
             self.recording -= 1
+            self.paragraph_flag = 1
 
     def handle_data(self, data):
-        if self.exclude_flag == 1:
+        if self.exclude_flag:
             return
         if self.recording:
-            self.article = self.article + data + '\n\n'
-            self.recording = False
+            if self.paragraph_flag:
+                self.article = '%s%s%s' % (self.article, '\n\n', data)
+                self.paragraph_flag = 0
+            else:
+                self.article = '%s%s' % (self.article, data)
+            if self.url_flag:
+                self.article = '%s [%s]' % (self.article, self.url_to_write)
+                self.url_flag = 0
 
 
 if __name__ == '__main__':

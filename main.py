@@ -10,14 +10,20 @@ class Main:
 
     def __init__(self):
 
+        self.settings = {
+            'main_content_selector': 'p',
+            'nested_selectors': ['p', 'i', 'span', 'a'],
+            'title_selector': 'h1',
+            'article': 'article',
+            'max_row_length': 80
+        }
+
         self.cur_dir = os.getcwd()
         self.url = self.get_url_from_argv()
         self.raw_html = self.get_raw_html()
-        parser = MyHTMLParser(self.url)
+        parser = MyHTMLParser(self.url, self.settings)
         parser.feed(self.raw_html)
-        self.content = parser.article
-        print(parser.article)
-        pass
+        self.content = self.make_rows(parser.content)
 
     def get_settings(self):
         settings_file = self.cur_dir + '/settings.json'
@@ -80,28 +86,55 @@ class Main:
         with open(file_path, 'w', encoding="utf-8") as file:
             file.write(self.content)
 
+    def make_rows(self, content):
+        raw_text = content
+        text = ''
+        rows = []
+        while raw_text:
+            if len(raw_text) <= self.settings['max_row_length']:
+                rows.append(raw_text)
+                raw_text = ""
+            else:
+                line_break_pos = raw_text.find('\n\n')
+                if line_break_pos < self.settings['max_row_length'] and line_break_pos != -1:
+                    rows.append(raw_text[:line_break_pos] + '\n')
+                    raw_text = raw_text[line_break_pos + 2:]
+                    line_break_pos = 0
+                else:
+                    for i in range(self.settings['max_row_length'] + 1, 0, -1):
+                        if str.isspace(raw_text[i]):
+                            rows.append(raw_text[:i])
+                            raw_text = raw_text[i + 1:]
+                            break
+                        if i == 1:
+                            for k in range(0 , len(raw_text), + 1):
+                                if str.isspace(raw_text[k]):
+                                    rows.append(raw_text[:k])
+                                    raw_text = raw_text[k + 1:]
+                                    break
+
+        for s in rows:
+            text = '%s%s\n' % (text, s)
+
+        return text
+
 
 class MyHTMLParser(HTMLParser):
 
-    def __init__(self, url):
+    def __init__(self, url, settings):
         super().__init__()
         self.user = 'x'
 
-        self.article = ''
+        self.content = ''
         self.recording = 0
         self.exclude_flag = 0
         self.paragraph_flag = 0
         self.url_flag = 0
         self.url_to_write = ''
+        self.title_flag = 0
         self.hostname = urllib.parse.urlparse(url)[1]
-        self.selectors = {
-            'main_content_selector': 'p',
-            'nested_selectors': ['p', 'i', 'span', 'a'],
-            'title': 'h1',
-            'article': 'article',
-        }
         self.exclude_selectors = ['header', 'footer']
-        pass
+        self.settings = settings
 
     def handle_starttag(self, tag, attrs):
         if tag in self.exclude_selectors:
@@ -113,7 +146,9 @@ class MyHTMLParser(HTMLParser):
             if not urllib.parse.urlparse(self.url_to_write)[1]:
                 self.url_to_write = '%s%s' % (self.hostname, self.url_to_write)
 
-        if tag in self.selectors['main_content_selector']:
+        if tag in self.settings['title_selector']:
+            self.title_flag = 1
+        if tag in self.settings['main_content_selector']:
             self.recording = 1
         else:
             return
@@ -122,25 +157,27 @@ class MyHTMLParser(HTMLParser):
         if tag in self.exclude_selectors and self.exclude_flag:
             self.exclude_flag = 0
             return
-        if tag == self.selectors['main_content_selector'] and self.recording:
+        if tag == self.settings['main_content_selector'] and self.recording:
             self.recording -= 1
             self.paragraph_flag = 1
 
     def handle_data(self, data):
+        if self.title_flag:
+            self.content = '%s%s%s' % (self.content, data, '\n\n')
+            self.title_flag = 0
         if self.exclude_flag:
             return
         if self.recording:
             if self.paragraph_flag:
-                self.article = '%s%s%s' % (self.article, '\n\n', data)
+                self.content = '%s%s%s' % (self.content, '\n\n', data)
                 self.paragraph_flag = 0
             else:
-                self.article = '%s%s' % (self.article, data)
+                self.content = '%s%s' % (self.content, data)
             if self.url_flag:
-                self.article = '%s [%s]' % (self.article, self.url_to_write)
+                self.content = '%s [%s]' % (self.content, self.url_to_write)
                 self.url_flag = 0
 
 
 if __name__ == '__main__':
     main = Main()
-
     main.write_to_file()

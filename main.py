@@ -16,7 +16,7 @@ class Main:
         self.raw_html = self.get_raw_html()
         self.settings = {
             'main_content_selectors': 'p',
-            'nested_selectors': ['p', 'i', 'span', 'a'],
+            'nested_selectors': ['p', 'i', 'span', 'a', 'b', 'strong'],
             'title_selector': 'h1',
             'max_row_length': 80,
             'exclude_selectors': ['header', 'footer'],
@@ -52,6 +52,7 @@ class Main:
 
         try:
             response = requests.get(self.url, headers=headers)
+            response.encoding = 'utf-8'
             if response.status_code is not 200:
                 print("Что-то пошло не так...")
                 sys.exit()
@@ -118,6 +119,8 @@ class Main:
                             raw_text = raw_text[i + 1:]
                             break
                         if i == 1:
+                            """Иногда слова больше чем лимит символов (например ссылки), 
+                            поэтому сохраняем всю строку без переноса"""
                             for k in range(0 , len(raw_text), + 1):
                                 if str.isspace(raw_text[k]):
                                     rows.append(raw_text[:k])
@@ -185,6 +188,9 @@ class MyHTMLParser(HTMLParser):
             self.paragraph_flag = 1
 
     def handle_data(self, data):
+        if len(data) == 0:
+            return
+
         if self.exclude_flag:
             return
 

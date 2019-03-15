@@ -1,10 +1,12 @@
 {
-   "main_content_selector":"p",
+   "main_content_selectors":"p",
    "nested_selectors":[
       "p",
       "i",
       "span",
-      "a"
+      "a",
+      "b",
+      "strong"
    ],
    "title_selector":"h1",
    "max_row_length":80,

@@ -98,6 +98,7 @@ https://gorobzor.ru/novosti/ekonomika/24362-otzyv-licenzii-roskomsnabbanka-mozhe
 https://sport.pravda.ru/news/1409954-biathlon/ - Текст страницы без мусора
 
 ##Итог
+
 Учитывая не идеальный результат на всех страницах, в дальнейшем нужно добавить:
  - Более тонкую настройку фильтров. 
  - Привязку фильтров к домену.

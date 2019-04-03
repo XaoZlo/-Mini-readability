@@ -52,7 +52,6 @@ class Main:
 
         try:
             response = requests.get(self.url, headers=headers)
-            response.encoding = 'utf-8'
             if response.status_code is not 200:
                 print("Что-то пошло не так...")
                 sys.exit()
